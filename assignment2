@@ -1,0 +1,204 @@
+Task 1:
+
+Mount Google Drive: If your dataset is on Google Drive, you need to mount it to access the data. You can do this using the following code:
+
+from google.colab import drive
+drive.mount('/content/drive')
+Import Required Libraries: Import TensorFlow and any other necessary libraries.
+
+Load and Preprocess the Dataset: Load the dataset from the provided folder and preprocess it. Split the dataset into training and validation sets. You can use TensorFlow's data generator to perform the split and data augmentation:
+
+
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+
+data_dir = '/content/drive/MyDrive/Hand_written_digits'
+batch_size = 32
+image_size = (100, 100)
+
+train_data_generator = ImageDataGenerator(
+    rescale=1.0 / 255,
+    rotation_range=20,
+    width_shift_range=0.2,
+    height_shift_range=0.2,
+    shear_range=0.2,
+    zoom_range=0.2,
+    horizontal_flip=True,
+    fill_mode='nearest'
+)
+
+train_generator = train_data_generator.flow_from_directory(
+    data_dir,
+    target_size=image_size,
+    batch_size=batch_size,
+    class_mode='categorical',
+    subset='training'
+)
+
+validation_data_generator = ImageDataGenerator(rescale=1.0 / 255)
+
+validation_generator = validation_data_generator.flow_from_directory(
+    data_dir,
+    target_size=image_size,
+    batch_size=batch_size,
+    class_mode='categorical',
+    subset='validation'
+)
+Define the CNN Model: Define your CNN model architecture. You can create a model similar to the one provided in your description or design your own architecture.
+
+import tensorflow as tf
+from tensorflow.keras import layers, models
+
+model = models.Sequential([
+    layers.Conv2D(32, (3, 3), activation='relu', input_shape=(100, 100, 3)),
+    layers.MaxPooling2D((2, 2)),
+    layers.Conv2D(64, (3, 3), activation='relu'),
+    layers.MaxPooling2D((2, 2)),
+    layers.Conv2D(128, (3, 3), activation='relu'),
+    layers.MaxPooling2D((2, 2)),
+    layers.Flatten(),
+    layers.Dense(128, activation='relu'),
+    layers.Dense(3, activation='softmax')
+])
+Compile the Model:
+
+model.compile(optimizer='adam',
+              loss='categorical_crossentropy',
+              metrics=['accuracy'])
+Train the Model:
+python
+Copy code
+epochs = 10
+history = model.fit(train_generator,
+                    epochs=epochs,
+                    validation_data=validation_generator)
+Evaluate the Model:
+
+loss, accuracy = model.evaluate(validation_generator)
+print(f'Validation accuracy: {accuracy * 100:.2f}%')
+
+Task 2:
+import tensorflow as tf
+from tensorflow.keras.applications import VGG16
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+
+# Load the pre-trained VGG16 model
+base_model = VGG16(weights='imagenet', include_top=False, input_shape=(100, 100, 3))
+
+# Remove top layers
+x = base_model.output
+
+# Add custom classification layers
+x = tf.keras.layers.Flatten()(x)
+x = tf.keras.layers.Dense(128, activation='relu')(x)
+predictions = tf.keras.layers.Dense(3, activation='softmax')(x)
+
+# Create the final model
+model = tf.keras.models.Model(inputs=base_model.input, outputs=predictions)
+
+# Data preparation and augmentation
+data_dir = 'Hand_written_digits'
+batch_size = 32
+image_size = (100, 100)
+
+train_data_generator = ImageDataGenerator(
+    rescale=1.0 / 255,
+    rotation_range=20,
+    width_shift_range=0.2,
+    height_shift_range=0.2,
+    shear_range=0.2,
+    zoom_range=0.2,
+    horizontal_flip=True,
+    fill_mode='nearest'
+)
+
+train_generator = train_data_generator.flow_from_directory(
+    data_dir,
+    target_size=image_size,
+    batch_size=batch_size,
+    class_mode='categorical',
+    subset='training'
+)
+
+validation_data_generator = ImageDataGenerator(rescale=1.0 / 255)
+
+validation_generator = validation_data_generator.flow_from_directory(
+    data_dir,
+    target_size=image_size,
+    batch_size=batch_size,
+    class_mode='categorical',
+    subset='validation'
+)
+
+# Fine-tuning (you can specify which layers to fine-tune)
+for layer in base_model.layers:
+    layer.trainable = False
+
+# Compile the model
+model.compile(optimizer='adam',
+              loss='categorical_crossentropy',
+              metrics=['accuracy'])
+
+# Train the model
+epochs = 10
+history = model.fit(train_generator,
+                    epochs=epochs,
+                    validation_data=validation_generator)
+
+# Evaluate the model
+loss, accuracy = model.evaluate(validation_generator)
+print(f'Fine-tuned model validation accuracy: {accuracy * 100:.2f}%')
+
+#task 3
+
+1.Import Required Libraries:
+import os
+import cv2
+import numpy as np
+from tensorflow.keras.applications import VGG16
+from tensorflow.keras.applications.vgg16 import preprocess_input
+from sklearn.metrics.pairwise import euclidean_distances
+from skimage.metrics import structural_similarity as ssim
+from operator import itemgetter
+2.Load and Preprocess Query Image:
+def load_and_preprocess_image(image_path):
+    img = cv2.imread(image_path)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    img = cv2.resize(img, (224, 224))
+    img = preprocess_input(img)
+    return img
+3.Extract Features from Images:
+def extract_features_from_images(image_paths):
+    model = VGG16(weights='imagenet', include_top=False)
+    features = []
+
+    for image_path in image_paths:
+        img = load_and_preprocess_image(image_path)
+        img = np.expand_dims(img, axis=0)
+        feature = model.predict(img).flatten()
+        features.append(feature)
+
+    return np.array(features)
+4.Find Similar Images:
+def find_similar_images(query_image, database_images, n=4):
+    query_feature = extract_features_from_images([query_image])
+    database_features = extract_features_from_images(database_images)
+
+    distances = euclidean_distances(query_feature, database_features)
+    similar_indices = distances.argsort()[0][:n]
+
+    return [database_images[i] for i in similar_indices]
+5.Main Program:
+if __name__ == "__main__":
+    query_image_path = "query_images/query_image.jpg"
+    database_folder = "images_database"
+
+    # List all image files in the database folder
+    database_images = [os.path.join(database_folder, f) for f in os.listdir(database_folder) if f.endswith(('.jpg', '.jpeg', '.png'))]
+
+    # Find the top N similar images
+    similar_images = find_similar_images(query_image_path, database_images, n=4)
+
+    for i, image in enumerate(similar_images):
+        print(f"Top {i + 1} Similar Image: {image}")
+
+ 
